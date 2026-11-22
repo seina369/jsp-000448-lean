@@ -1,0 +1,17 @@
+name = "JSP448"
+version = "0.1.0"
+defaultTargets = ["JSP448"]
+
+# Formal proof of the Erdős–Sós conjecture (JSP-000439), pinned to an exact commit.
+[[require]]
+name = "Erdos548"
+git = "https://github.com/tadamcz/erdos548.git"
+rev = "82ffb751f3d37768927df9239ed08439bbe0dd09"
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4.git"
+rev = "v4.28.0"
+
+[[lean_lib]]
+name = "JSP448"

@@ -1,0 +1,6 @@
+JSP-000448 Lean formalization
+Copyright 2026 seina369
+
+This product depends on (but does not include) the Lean formalization of the
+Erdős–Sós theorem from https://github.com/tadamcz/erdos548 (Apache-2.0,
+Copyright 2026 Tom Adamczewski / Epoch AI).
