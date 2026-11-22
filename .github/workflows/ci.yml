@@ -1,0 +1,26 @@
+name: build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          use-mathlib-cache: true
+      - name: Axiom audit
+        run: |
+          cat > Ax.lean <<'LEAN'
+          import JSP448
+          #print axioms JSP448.ramseyNumber_tree_linear
+          #print axioms JSP448.ramseyNumber_tree_le_tight
+          #print axioms JSP448.ramseyNumber_tree_le_parity
+          #print axioms JSP448.ramseyNumber_star_all
+          #print axioms JSP448.ramseyNumber_tree_eq_of_prime
+          #print axioms JSP448.multicolor_ramsey_trees_asym_tight
+          LEAN
+          lake env lean Ax.lean | tee axioms.txt
+          ! grep -v "depends on axioms: \[propext, Classical.choice, Quot.sound\]" axioms.txt
