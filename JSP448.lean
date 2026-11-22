@@ -15,15 +15,16 @@ multicolour Ramsey number of a tree grow linearly with its order?
 
 **What is proved here.** The upper bound `R_r(T) ≤ r·n + O(1)` (indeed
 `R_r(T) ≤ r(n-2) + 2`), which is the part that follows from the Erdős–Sós theorem;
-the trivial lower bound `R_r(T) ≥ n`; and exact values showing the upper bound
-cannot be improved in general.  The two-sided equality `R_r(T) = r·n + O(1)` is
-*not* proved, and for fixed `r` it is false for some trees (e.g. two-coloured paths,
-Gerencsér–Gyárfás 1967); that fact is not formalized here.
+the trivial lower bound `R_r(T) ≥ n`; exact values showing the upper bound cannot be
+improved in general; and the fact that the two-sided equality `R_r(T) = r·n + O(1)`
+is *false* already for two colours: paths have `R_2(P_n) ≤ (5n + 1)/3`
+(`ramseyNumber_two_not_two_mul_sub_const`).
 
 All of the mathematics is known; this file is a formalization.  Upper bounds:
 Erdős–Graham's observation applied to the Erdős–Sós theorem.  Stars: Burr–Roberts
 (1973).  Affine-plane lower bound: the simplest case of Erdős–Graham's design
-construction.
+construction.  Paths: a weak form of Gerencsér–Gyárfás (1967), whose sharp value
+`R_2(P_n) = ⌊3n/2⌋ - 1` is not needed and not proved.
 
 ## Results
 
@@ -44,7 +45,12 @@ Write `k` for the number of edges of the tree (`k + 1 = n` vertices), and `j = k
   size for each colour.
 * `ramseyNumber_tree_error_unbounded` : a one-sided remark — no constant independent
   of `r` bounds `r·n - R_r(T)`.
-* `starGraph_isTree`, `exists_star_tree`, `ramsey_set_nonempty` : non-vacuity.
+* `exists_long_monoPath` : every 2-colouring of `K_N` has a monochromatic path on at
+  least `(3N - 3)/5` vertices; hence `ramseyNumber_two_pathGraph_le` :
+  `R_2(P_n) ≤ N` whenever `5n ≤ 3N + 1`, and `ramseyNumber_two_not_two_mul_sub_const` :
+  for every `C` some tree `T` on `n` vertices has `R_2(T) + C < 2n`.
+* `starGraph_isTree`, `pathGraph_isTree`, `exists_star_tree`, `ramsey_set_nonempty` :
+  non-vacuity.
 
 ## Method
 
@@ -64,6 +70,14 @@ The lower bounds are three explicit colourings:
 * *affine plane* (`affineColouring`): on the `p × p` grid colour an edge by its
   slope; each colour class is contained in a union of `p` disjoint cliques of size
   `p` (the lines of that slope), too small for any connected graph on `p + 1` vertices.
+
+The path bound is a longest-path argument.  Let `P` be a longest monochromatic path,
+say red, and `U` the set of vertices off `P`.  A vertex of `U` cannot be red-joined to
+an end of `P`, nor to two consecutive vertices of `P`, and two vertices of `U`
+red-joined to consecutive vertices of `P` "crosswise" are blue-joined (otherwise `P`
+could be lengthened).  Using disjoint consecutive pairs of `P` as connectors, one
+builds a blue zigzag path through `U` that gains at least three vertices for every two
+vertices of `U` (`zigzag`); as it cannot be longer than `P`, `|U| ≤ 2|P|/3 + 1`.
 -/
 
 open SimpleGraph
@@ -811,13 +825,471 @@ theorem ramseyNumber_tree_eq_of_prime (j : ℕ) (hp : (j + 1).Prime)
 /-- For every constant `C`, with `r = C + 2` colours every tree `T` has
 `R_r(T) + C < r · |T|`.  So no bound `r · |T| ≤ R_r(T) + C` holds with `C`
 independent of the number of colours.  (This is a one-sided statement: it does not
-say that `R_r(T) = r·|T| + O_r(1)` holds for fixed `r`; that fails for paths.) -/
+say that `R_r(T) = r·|T| + O_r(1)` holds for fixed `r`; that fails for paths, see
+`ramseyNumber_two_not_two_mul_sub_const`.) -/
 theorem ramseyNumber_tree_error_unbounded (C : ℕ) :
     ∃ r, 1 ≤ r ∧ ∀ j, ∀ T : SimpleGraph (Fin (j + 1 + 1)), T.IsTree →
       ramseyNumber r T + C < r * (j + 1 + 1) := by
   refine ⟨C + 2, by omega, fun j T hT => ?_⟩
   have h := ramseyNumber_tree_le_tight (C + 2) j T hT
   have : (C + 2) * (j + 1 + 1) = (C + 2) * j + 2 * C + 4 := by ring
+  omega
+
+/-! ## Two-coloured paths: the equality `R_r(T) = r·n + O(1)` fails for `r = 2` -/
+
+/-- `l` is a monochromatic path of colour `i`: its vertices are distinct and
+consecutive vertices are joined by an edge of colour `i`. -/
+def MonoPath {N r : ℕ} (c : Sym2 (Fin N) → Fin r) (i : Fin r) (l : List (Fin N)) : Prop :=
+  l.Nodup ∧ l.IsChain (fun a b => c s(a, b) = i)
+
+theorem MonoPath.reverse {N r : ℕ} {c : Sym2 (Fin N) → Fin r} {i : Fin r} {l : List (Fin N)}
+    (h : MonoPath c i l) : MonoPath c i l.reverse := by
+  refine ⟨List.nodup_reverse.mpr h.1, ?_⟩
+  rw [List.isChain_reverse]
+  have : (fun a b : Fin N => c s(b, a) = i) = (fun a b => c s(a, b) = i) := by
+    funext a b; rw [Sym2.eq_swap]
+  rw [this]; exact h.2
+
+theorem MonoPath.cons {N r : ℕ} {c : Sym2 (Fin N) → Fin r} {i : Fin r} {l : List (Fin N)}
+    {v x : Fin N} (h : MonoPath c i (x :: l)) (hv : v ∉ x :: l) (hc : c s(v, x) = i) :
+    MonoPath c i (v :: x :: l) :=
+  ⟨List.nodup_cons.mpr ⟨hv, h.1⟩, List.isChain_cons_cons.mpr ⟨hc, h.2⟩⟩
+
+theorem MonoPath.insert_one {N r : ℕ} {c : Sym2 (Fin N) → Fin r} {i : Fin r}
+    {A B : List (Fin N)} {a b v : Fin N} (h : MonoPath c i (A ++ a :: b :: B))
+    (hv : v ∉ A ++ a :: b :: B) (h1 : c s(a, v) = i) (h2 : c s(v, b) = i) :
+    MonoPath c i (A ++ a :: v :: b :: B) := by
+  obtain ⟨hnd, hch⟩ := h
+  rw [List.isChain_append_cons_cons] at hch
+  refine ⟨?_, ?_⟩
+  · simp only [List.nodup_append, List.nodup_cons, List.mem_cons, List.mem_append, not_or] at hnd hv ⊢
+    grind
+  · rw [List.isChain_append_cons_cons]
+    exact ⟨hch.1, h1, List.isChain_cons_cons.mpr ⟨h2, hch.2.2⟩⟩
+
+theorem MonoPath.insert_two {N r : ℕ} {c : Sym2 (Fin N) → Fin r} {i : Fin r}
+    {A B : List (Fin N)} {a b v w : Fin N} (h : MonoPath c i (A ++ a :: b :: B))
+    (hv : v ∉ A ++ a :: b :: B) (hw : w ∉ A ++ a :: b :: B) (hvw : v ≠ w)
+    (h1 : c s(a, v) = i) (h2 : c s(v, w) = i) (h3 : c s(w, b) = i) :
+    MonoPath c i (A ++ a :: v :: w :: b :: B) := by
+  obtain ⟨hnd, hch⟩ := h
+  rw [List.isChain_append_cons_cons] at hch
+  refine ⟨?_, ?_⟩
+  · simp only [List.nodup_append, List.nodup_cons, List.mem_cons, List.mem_append, not_or] at hnd hv hw ⊢
+    grind
+  · rw [List.isChain_append_cons_cons]
+    exact ⟨hch.1, h1, List.isChain_cons_cons.mpr ⟨h2, List.isChain_cons_cons.mpr ⟨h3, hch.2.2⟩⟩⟩
+
+/-- Splitting a list at two consecutive positions. -/
+theorem list_split_at (l : List (Fin N)) (t : ℕ) (ht : t + 1 < l.length) :
+    l = l.take t ++ l[t] :: l[t + 1] :: l.drop (t + 2) := by
+  conv_lhs => rw [← List.take_append_drop t l]
+  congr 1
+  rw [List.drop_eq_getElem_cons (by omega), List.drop_eq_getElem_cons (by omega)]
+
+
+theorem two_colours {i j : Fin 2} (hij : i ≠ j) (x : Fin 2) (hx : x ≠ i) : x = j := by
+  have h1 := Fin.val_ne_of_ne hij
+  have h2 := Fin.val_ne_of_ne hx
+  apply Fin.ext
+  omega
+
+section Longest
+
+variable {N : ℕ} (c : Sym2 (Fin N) → Fin 2) (i j : Fin 2) (hij : i ≠ j)
+  (P : List (Fin N)) (hP : MonoPath c i P)
+  (hmax : ∀ i' l, MonoPath c i' l → l.length ≤ P.length)
+
+include hij hP hmax
+
+/-- A vertex outside a longest monochromatic path is joined to its first vertex in
+the other colour. -/
+theorem other_colour_head (h0 : 0 < P.length) (v : Fin N) (hv : v ∉ P) :
+    c s(v, P[0]) = j := by
+  apply two_colours hij
+  intro hc
+  match P, hP, hmax, h0, hv, hc with
+  | x :: P', hP, hmax, _, hv, hc =>
+    have := hmax i _ (hP.cons hv hc)
+    simp at this
+
+omit hij hP hmax in
+theorem longest_reverse (hmax : ∀ i' l, MonoPath c i' l → l.length ≤ P.length) :
+    ∀ i' l, MonoPath c i' l → l.length ≤ P.reverse.length := by
+  intro i' l hl; rw [List.length_reverse]; exact hmax i' l hl
+
+/-- ... and to its last vertex. -/
+theorem other_colour_last (h0 : 0 < P.length) (v : Fin N) (hv : v ∉ P) :
+    c s(v, P[P.length - 1]) = j := by
+  have h := other_colour_head c i j hij P.reverse hP.reverse
+    (longest_reverse c P hmax) (by simpa using h0) v (by simpa using hv)
+  simpa [List.getElem_reverse] using h
+
+/-- A vertex outside a longest monochromatic path cannot be joined in the path's colour
+to two consecutive vertices of it. -/
+theorem other_colour_pair (t : ℕ) (ht : t + 1 < P.length) (v : Fin N) (hv : v ∉ P) :
+    c s(v, P[t]) = j ∨ c s(v, P[t + 1]) = j := by
+  by_contra hcon
+  push_neg at hcon
+  have h1 : c s(v, P[t]) = i := by
+    by_contra h; exact hcon.1 (two_colours hij _ h)
+  have h2 : c s(v, P[t + 1]) = i := by
+    by_contra h; exact hcon.2 (two_colours hij _ h)
+  have hsplit := list_split_at P t ht
+  have hP' := hP
+  rw [hsplit] at hP'
+  have hv' : v ∉ P.take t ++ P[t] :: P[t + 1] :: P.drop (t + 2) := by rw [← hsplit]; exact hv
+  have hnew := hP'.insert_one hv' (by rw [Sym2.eq_swap]; exact h1) h2
+  have hlen := hmax i _ hnew
+  have hl := congrArg List.length hsplit
+  simp only [List.length_append, List.length_cons] at hlen hl
+  omega
+
+/-- Two outside vertices `v`, `w` with `P[t] — v` and `w — P[t+1]` in the path's colour
+are joined in the other colour. -/
+theorem other_colour_cross (t : ℕ) (ht : t + 1 < P.length) (v w : Fin N) (hv : v ∉ P)
+    (hw : w ∉ P) (hvw : v ≠ w) (h1 : c s(P[t], v) = i) (h3 : c s(w, P[t + 1]) = i) :
+    c s(v, w) = j := by
+  apply two_colours hij
+  intro h2
+  have hsplit := list_split_at P t ht
+  have hP' := hP
+  rw [hsplit] at hP'
+  have hv' : v ∉ P.take t ++ P[t] :: P[t + 1] :: P.drop (t + 2) := by rw [← hsplit]; exact hv
+  have hw' : w ∉ P.take t ++ P[t] :: P[t + 1] :: P.drop (t + 2) := by rw [← hsplit]; exact hw
+  have hnew := hP'.insert_two hv' hw' hvw h1 h2 h3
+  have hlen := hmax i _ hnew
+  have hl := congrArg List.length hsplit
+  simp only [List.length_append, List.length_cons] at hlen hl
+  omega
+
+/-- **Zigzag lemma.** Let `P` be a longest monochromatic path (colour `i`), and let
+`2m + 2 ≤ |P|`. For `j ≤ m`, a set `W` of vertices outside `P` and a further outside
+vertex `u`, there is a path in the other colour starting at `u`, using only vertices
+of `W` and the path vertices `P[1], …, P[2j]`, with at least
+`1 + min (2j) ⌊3(|W| - 1)/2⌋` vertices. -/
+theorem zigzag (m : ℕ) (hm : 2 * m + 2 ≤ P.length) :
+    ∀ k ≤ m, ∀ (W : Finset (Fin N)) (u : Fin N), (∀ w ∈ W, w ∉ P) → u ∉ P → u ∉ W →
+      ∃ l : List (Fin N), MonoPath c j (u :: l) ∧
+        (∀ x ∈ l, x ∈ W ∨ ∃ t, 1 ≤ t ∧ t ≤ 2 * k ∧ ∃ h : t < P.length, P[t] = x) ∧
+        1 + min (2 * k) (3 * (W.card - 1) / 2) ≤ (u :: l).length := by
+  classical
+  intro k
+  induction k with
+  | zero =>
+    intro _ W u _ _ _
+    exact ⟨[], ⟨by simp, by simp⟩, by simp, by simp⟩
+  | succ k ih =>
+    intro hk W u hW hu huW
+    by_cases hcard : W.card ≤ 1
+    · refine ⟨[], ⟨by simp, by simp⟩, by simp, ?_⟩
+      have : 3 * (W.card - 1) / 2 = 0 := by omega
+      simp [this]
+    push_neg at hcard
+    have hta : 2 * k + 1 + 1 < P.length := by omega
+    have hpair := fun v hv => other_colour_pair c i j hij P hP hmax (2 * k + 1) hta v hv
+    -- path vertices at indices `2k+1`, `2k+2` are new
+    have hnewP : ∀ y, (y = P[2 * k + 1] ∨ y = P[2 * k + 1 + 1]) → y ∈ P ∧
+        ∀ t, t ≤ 2 * k → ∀ h : t < P.length, P[t] ≠ y := by
+      rintro y (rfl | rfl)
+      · exact ⟨List.getElem_mem _, fun t ht h he => by
+          have := (hP.1.getElem_inj_iff).mp he; omega⟩
+      · exact ⟨List.getElem_mem _, fun t ht h he => by
+          have := (hP.1.getElem_inj_iff).mp he; omega⟩
+    -- the common core: given the next outside vertex `w`, a connector `y`, and the
+    -- remaining set `W'`, extend the path produced by the induction hypothesis
+    have build : ∀ (pre : List (Fin N)) (y w : Fin N) (W' : Finset (Fin N)),
+        (y = P[2 * k + 1] ∨ y = P[2 * k + 1 + 1]) → w ∈ W → W' ⊆ W → w ∉ W' →
+        (∀ z ∈ pre, z ∈ W ∧ z ∉ W' ∧ z ≠ w) → pre.Nodup →
+        MonoPath c j (u :: (pre ++ [y, w])) →
+        1 + min (2 * (k + 1)) (3 * (W.card - 1) / 2) ≤
+          pre.length + 3 + min (2 * k) (3 * (W'.card - 1) / 2) →
+        ∃ l : List (Fin N), MonoPath c j (u :: l) ∧
+          (∀ x ∈ l, x ∈ W ∨ ∃ t, 1 ≤ t ∧ t ≤ 2 * (k + 1) ∧ ∃ h : t < P.length, P[t] = x) ∧
+          1 + min (2 * (k + 1)) (3 * (W.card - 1) / 2) ≤ (u :: l).length := by
+      intro pre y w W' hy hwW hsub hwW' hpre hprend hmono hnum
+      obtain ⟨hyP, hynew⟩ := hnewP y hy
+      obtain ⟨l', hl', hmem', hlen'⟩ := ih (by omega) W' w (fun z hz => hW z (hsub hz))
+        (hW w hwW) hwW'
+      have hnotin : ∀ z, z ∉ W' → (∀ t, t ≤ 2 * k → ∀ h : t < P.length, P[t] ≠ z) → z ∉ l' := by
+        intro z hz1 hz2 hzl
+        rcases hmem' z hzl with h | ⟨t, _, ht2, h, he⟩
+        · exact hz1 h
+        · exact hz2 t ht2 h he
+      have houtside : ∀ z, z ∉ P → ∀ t, t ≤ 2 * k → ∀ h : t < P.length, P[t] ≠ z :=
+        fun z hz t _ h he => hz (he ▸ List.getElem_mem _)
+      refine ⟨pre ++ y :: w :: l', ⟨?_, ?_⟩, ?_, ?_⟩
+      · -- distinct vertices
+        have hnd := hmono.1
+        have hnd' := hl'.1
+        have hu_l' : u ∉ l' := hnotin u (fun h => huW (hsub h)) (houtside u hu)
+        have hy_l' : y ∉ l' := hnotin y (fun h => hW y (hsub h) hyP) hynew
+        have hpre_l' : ∀ z ∈ pre, z ∉ l' := fun z hz =>
+          hnotin z (hpre z hz).2.1 (houtside z (hW z (hpre z hz).1))
+        simp only [List.nodup_cons, List.nodup_append, List.mem_cons, List.mem_append,
+          List.not_mem_nil, or_false, not_or] at hnd hnd' ⊢
+        grind
+      · -- consecutive vertices are joined in colour `j`
+        have hch := hmono.2
+        have hch' := hl'.2
+        have e1 : u :: (pre ++ [y, w]) = (u :: pre) ++ y :: w :: [] := by simp
+        have e2 : u :: (pre ++ y :: w :: l') = (u :: pre) ++ y :: w :: l' := by simp
+        rw [e1, List.isChain_append_cons_cons] at hch
+        rw [e2, List.isChain_append_cons_cons]
+        exact ⟨hch.1, hch.2.1, hch'⟩
+      · intro x hx
+        simp only [List.mem_append, List.mem_cons] at hx
+        rcases hx with hx | rfl | rfl | hx
+        · exact Or.inl (hpre x hx).1
+        · right
+          rcases hy with rfl | rfl
+          · exact ⟨2 * k + 1, by omega, by omega, by omega, rfl⟩
+          · exact ⟨2 * k + 1 + 1, by omega, by omega, by omega, rfl⟩
+        · exact Or.inl hwW
+        · rcases hmem' x hx with h | ⟨t, ht1, ht2, h, he⟩
+          · exact Or.inl (hsub h)
+          · exact Or.inr ⟨t, ht1, by omega, h, he⟩
+      · simp only [List.length_cons, List.length_append] at hlen' ⊢
+        omega
+    by_cases h1 : ∃ w ∈ W, ∃ y, (y = P[2 * k + 1] ∨ y = P[2 * k + 1 + 1]) ∧
+        c s(u, y) = j ∧ c s(w, y) = j
+    · -- a common neighbour in the other colour: `u, y, w, …`
+      obtain ⟨w, hwW, y, hy, huy, hwy⟩ := h1
+      have hyP := (hnewP y hy).1
+      refine build [] y w (W.erase w) hy hwW (Finset.erase_subset _ _)
+        (Finset.notMem_erase _ _) (by simp) (by simp) ⟨?_, ?_⟩ ?_
+      · have huw : u ≠ w := fun h => huW (h ▸ hwW)
+        have huy' : u ≠ y := fun h => hu (h ▸ hyP)
+        have hyw : y ≠ w := fun h => hW w hwW (h ▸ hyP)
+        simp [huw, huy', hyw]
+      · simp only [List.nil_append]
+        exact List.isChain_cons_cons.mpr ⟨huy, List.isChain_cons_cons.mpr
+          ⟨by rw [Sym2.eq_swap]; exact hwy, by simp⟩⟩
+      · rw [Finset.card_erase_of_mem hwW]
+        simp only [List.length_nil]
+        omega
+    · -- no common neighbour: `u, w₁, y, w₂, …`
+      push_neg at h1
+      obtain ⟨w₁, hw₁, w₂, hw₂, hne⟩ := Finset.one_lt_card.mp hcard
+      have key : ∃ y, (y = P[2 * k + 1] ∨ y = P[2 * k + 1 + 1]) ∧ c s(u, w₁) = j ∧
+          c s(w₁, y) = j ∧ c s(w₂, y) = j := by
+        have hi_of : ∀ e, c e ≠ j → c e = i := fun e he => two_colours hij.symm _ he
+        rcases hpair u hu with hua | hub
+        · -- `u` sees `P[2k+1]` in colour `j`; the `W`-vertices then see `P[2k+2]`
+          have hw₁a : c s(w₁, P[2 * k + 1]) ≠ j := h1 w₁ hw₁ _ (Or.inl rfl) hua
+          have hw₂a : c s(w₂, P[2 * k + 1]) ≠ j := h1 w₂ hw₂ _ (Or.inl rfl) hua
+          have hw₁b := (hpair w₁ (hW w₁ hw₁)).resolve_left hw₁a
+          have hw₂b := (hpair w₂ (hW w₂ hw₂)).resolve_left hw₂a
+          have hub : c s(u, P[2 * k + 1 + 1]) ≠ j := fun h => h1 w₁ hw₁ _ (Or.inr rfl) h hw₁b
+          refine ⟨_, Or.inr rfl, ?_, hw₁b, hw₂b⟩
+          have := other_colour_cross c i j hij P hP hmax (2 * k + 1) hta w₁ u (hW w₁ hw₁) hu
+            (fun h => huW (h ▸ hw₁)) (by rw [Sym2.eq_swap]; exact hi_of _ hw₁a) (hi_of _ hub)
+          rw [Sym2.eq_swap]; exact this
+        · have hw₁b : c s(w₁, P[2 * k + 1 + 1]) ≠ j := h1 w₁ hw₁ _ (Or.inr rfl) hub
+          have hw₂b : c s(w₂, P[2 * k + 1 + 1]) ≠ j := h1 w₂ hw₂ _ (Or.inr rfl) hub
+          have hw₁a := (hpair w₁ (hW w₁ hw₁)).resolve_right hw₁b
+          have hw₂a := (hpair w₂ (hW w₂ hw₂)).resolve_right hw₂b
+          have hua : c s(u, P[2 * k + 1]) ≠ j := fun h => h1 w₁ hw₁ _ (Or.inl rfl) h hw₁a
+          refine ⟨_, Or.inl rfl, ?_, hw₁a, hw₂a⟩
+          exact other_colour_cross c i j hij P hP hmax (2 * k + 1) hta u w₁ hu (hW w₁ hw₁)
+            (fun h => huW (h ▸ hw₁)) (by rw [Sym2.eq_swap]; exact hi_of _ hua) (hi_of _ hw₁b)
+      obtain ⟨y, hy, huw₁, hw₁y, hw₂y⟩ := key
+      have hyP := (hnewP y hy).1
+      have hw₂' : w₂ ∈ W.erase w₁ := Finset.mem_erase.mpr ⟨hne.symm, hw₂⟩
+      refine build [w₁] y w₂ ((W.erase w₁).erase w₂) hy hw₂
+        ((Finset.erase_subset _ _).trans (Finset.erase_subset _ _))
+        (Finset.notMem_erase _ _) ?_ (by simp) ⟨?_, ?_⟩ ?_
+      · intro z hz
+        simp only [List.mem_singleton] at hz
+        subst hz
+        exact ⟨hw₁, fun h => (Finset.mem_erase.mp (Finset.mem_of_mem_erase h)).1 rfl, hne⟩
+      · have a1 : u ≠ w₁ := fun h => huW (h ▸ hw₁)
+        have a2 : u ≠ w₂ := fun h => huW (h ▸ hw₂)
+        have a3 : u ≠ y := fun h => hu (h ▸ hyP)
+        have a4 : w₁ ≠ y := fun h => hW w₁ hw₁ (h ▸ hyP)
+        have a5 : y ≠ w₂ := fun h => hW w₂ hw₂ (h ▸ hyP)
+        simp [a1, a2, a3, a4, a5, hne]
+      · simp only [List.singleton_append]
+        exact List.isChain_cons_cons.mpr ⟨huw₁, List.isChain_cons_cons.mpr
+          ⟨hw₁y, List.isChain_cons_cons.mpr ⟨by rw [Sym2.eq_swap]; exact hw₂y, by simp⟩⟩⟩
+      · rw [Finset.card_erase_of_mem hw₂', Finset.card_erase_of_mem hw₁]
+        simp only [List.length_singleton]
+        omega
+
+end Longest
+
+
+/-- **Long monochromatic paths (a weak form of Gerencsér–Gyárfás).** Every colouring of
+the edges of `K_N` with two colours has a monochromatic path on at least `(3N - 3)/5`
+vertices. -/
+theorem exists_long_monoPath (N : ℕ) (c : Sym2 (Fin N) → Fin 2) :
+    ∃ i l, MonoPath c i l ∧ 3 * N ≤ 5 * l.length + 3 := by
+  classical
+  -- a longest monochromatic path
+  let S : Set ℕ := {k | ∃ i l, MonoPath c i l ∧ l.length = k}
+  have hS0 : (0 : ℕ) ∈ S := ⟨0, [], ⟨by simp, by simp⟩, rfl⟩
+  have hSb : BddAbove S := ⟨N, by
+    rintro k ⟨i, l, hl, rfl⟩
+    simpa using hl.1.length_le_card⟩
+  obtain ⟨i, P, hP, hPk⟩ := Nat.sSup_mem ⟨0, hS0⟩ hSb
+  have hmax : ∀ i' l, MonoPath c i' l → l.length ≤ P.length := by
+    intro i' l hl
+    rw [hPk]
+    exact le_csSup hSb ⟨i', l, hl, rfl⟩
+  obtain ⟨j, hij⟩ : ∃ j : Fin 2, i ≠ j := by
+    by_cases h : i = 0
+    · exact ⟨1, by rw [h]; decide⟩
+    · exact ⟨0, h⟩
+  set U : Finset (Fin N) := Finset.univ.filter (· ∉ P) with hUdef
+  have hUmem : ∀ v, v ∈ U ↔ v ∉ P := fun v => by simp [hUdef]
+  have hUcard : U.card + P.length = N := by
+    have h1 : U = Finset.univ \ P.toFinset := by ext v; simp [hUdef]
+    rw [h1, Finset.card_sdiff_of_subset (Finset.subset_univ _), Finset.card_univ,
+      Fintype.card_fin, List.toFinset_card_of_nodup hP.1]
+    have := hP.1.length_le_card
+    simp at this
+    omega
+  -- at least two vertices on the path as soon as `N ≥ 2`
+  have hk2 : 2 ≤ N → 2 ≤ P.length := by
+    intro hN
+    have h := hmax (c s(⟨0, by omega⟩, ⟨1, by omega⟩)) [⟨0, by omega⟩, ⟨1, by omega⟩]
+      ⟨by simp [Fin.ext_iff], by simp⟩
+    simpa using h
+  by_cases hU3 : U.card ≤ 2
+  · refine ⟨i, P, hP, ?_⟩
+    by_cases hN : 2 ≤ N
+    · have := hk2 hN; omega
+    · omega
+  push_neg at hU3
+  obtain ⟨w, u₀, u₁, hw, hu₀, hu₁, hwu₀, hwu₁, hu₀u₁⟩ := Finset.two_lt_card_iff.mp hU3
+  have hN : 2 ≤ N := by omega
+  have hk := hk2 hN
+  have hwP := (hUmem w).mp hw
+  have hu₀P := (hUmem u₀).mp hu₀
+  have hu₁P := (hUmem u₁).mp hu₁
+  set W : Finset (Fin N) := ((U.erase w).erase u₀).erase u₁ with hWdef
+  have hWsub : W ⊆ U := (Finset.erase_subset _ _).trans
+    ((Finset.erase_subset _ _).trans (Finset.erase_subset _ _))
+  have hWcard : W.card = U.card - 3 := by
+    rw [hWdef, Finset.card_erase_of_mem, Finset.card_erase_of_mem, Finset.card_erase_of_mem hw]
+    · omega
+    · exact Finset.mem_erase.mpr ⟨hwu₀.symm, hu₀⟩
+    · exact Finset.mem_erase.mpr ⟨hu₀u₁.symm, Finset.mem_erase.mpr ⟨hwu₁.symm, hu₁⟩⟩
+  have hwW : w ∉ W := fun h => by
+    simp only [hWdef, Finset.mem_erase] at h; exact h.2.2.1 rfl
+  have hu₀W : u₀ ∉ W := fun h => by
+    simp only [hWdef, Finset.mem_erase] at h; exact h.2.1 rfl
+  have hu₁W : u₁ ∉ W := fun h => by
+    simp only [hWdef, Finset.mem_erase] at h; exact h.1 rfl
+  obtain ⟨l, hl, hmem, hlen⟩ := zigzag c i j hij P hP hmax ((P.length - 2) / 2) (by omega)
+    ((P.length - 2) / 2) le_rfl W u₁ (fun z hz => (hUmem z).mp (hWsub hz)) hu₁P hu₁W
+  have h0 : 0 < P.length := by omega
+  have hlast := fun v hv => other_colour_last c i j hij P hP hmax h0 v hv
+  have hhead := fun v hv => other_colour_head c i j hij P hP hmax h0 v hv
+  have hx₁ : P[0] ∈ P := List.getElem_mem _
+  have hxk : P[P.length - 1] ∈ P := List.getElem_mem _
+  have hx₁k : P[P.length - 1] ≠ P[0] := fun he => by
+    have := (hP.1.getElem_inj_iff).mp he; omega
+  -- membership facts for the zigzag part
+  have hnotin : ∀ z, z ∉ W → (∀ t, 1 ≤ t → t ≤ 2 * ((P.length - 2) / 2) →
+      ∀ h : t < P.length, P[t] ≠ z) → z ∉ l := by
+    intro z hz1 hz2 hzl
+    rcases hmem z hzl with h | ⟨t, ht1, ht2, h, he⟩
+    · exact hz1 h
+    · exact hz2 t ht1 ht2 h he
+  have houtside : ∀ z, z ∉ P → ∀ t, 1 ≤ t → t ≤ 2 * ((P.length - 2) / 2) →
+      ∀ h : t < P.length, P[t] ≠ z := fun z hz t _ _ h he => hz (he ▸ List.getElem_mem _)
+  have hw_l : w ∉ l := hnotin w hwW (houtside w hwP)
+  have hu₀_l : u₀ ∉ l := hnotin u₀ hu₀W (houtside u₀ hu₀P)
+  have hx₁_l : P[0] ∉ l := hnotin _ (fun h => (hUmem _).mp (hWsub h) hx₁)
+    (fun t ht1 _ h he => by have := (hP.1.getElem_inj_iff).mp he; omega)
+  have hxk_l : P[P.length - 1] ∉ l := hnotin _ (fun h => (hUmem _).mp (hWsub h) hxk)
+    (fun t _ ht2 h he => by have := (hP.1.getElem_inj_iff).mp he; omega)
+  have hbig : MonoPath c j (w :: P[P.length - 1] :: u₀ :: P[0] :: u₁ :: l) := by
+    refine ⟨?_, ?_⟩
+    · have hnd := hl.1
+      have a1 : w ≠ P[P.length - 1] := fun h => hwP (h ▸ hxk)
+      have a2 : w ≠ P[0] := fun h => hwP (h ▸ hx₁)
+      have a3 : u₀ ≠ P[P.length - 1] := fun h => hu₀P (h ▸ hxk)
+      have a4 : u₀ ≠ P[0] := fun h => hu₀P (h ▸ hx₁)
+      have a5 : u₁ ≠ P[P.length - 1] := fun h => hu₁P (h ▸ hxk)
+      have a6 : u₁ ≠ P[0] := fun h => hu₁P (h ▸ hx₁)
+      simp only [List.nodup_cons, List.mem_cons, not_or] at hnd ⊢
+      grind
+    · refine List.isChain_cons_cons.mpr ⟨hlast w hwP, List.isChain_cons_cons.mpr
+        ⟨by rw [Sym2.eq_swap]; exact hlast u₀ hu₀P, List.isChain_cons_cons.mpr
+        ⟨hhead u₀ hu₀P, List.isChain_cons_cons.mpr
+        ⟨by rw [Sym2.eq_swap]; exact hhead u₁ hu₁P, hl.2⟩⟩⟩⟩
+  have hfinal := hmax j _ hbig
+  simp only [List.length_cons] at hfinal hlen
+  refine ⟨i, P, hP, ?_⟩
+  omega
+
+/-- A monochromatic path on at least `n` vertices contains the path graph on `n`
+vertices. -/
+theorem pathGraph_isContained_of_monoPath {N r : ℕ} (c : Sym2 (Fin N) → Fin r) (i : Fin r)
+    (l : List (Fin N)) (h : MonoPath c i l) (n : ℕ) (hn : n ≤ l.length) :
+    (pathGraph n).IsContained (colourClass c i) := by
+  have hstep : ∀ (s t : ℕ) (hs : s < l.length) (ht : t < l.length), s + 1 = t →
+      (colourClass c i).Adj l[s] l[t] := by
+    intro s t hs ht hst
+    subst hst
+    exact ⟨fun he => by have := (h.1.getElem_inj_iff).mp he; omega, h.2.getElem s ht⟩
+  refine ⟨⟨⟨fun t => l[t.val]'(lt_of_lt_of_le t.isLt hn), ?_⟩, ?_⟩⟩
+  · intro a b hab
+    rcases pathGraph_adj.mp hab with h1 | h1
+    · exact hstep _ _ _ _ h1
+    · exact (hstep _ _ _ _ h1).symm
+  · intro a b hab
+    exact Fin.ext ((h.1.getElem_inj_iff).mp hab)
+
+/-- **Two-coloured paths.** If `5n ≤ 3N + 1` then `R_2(P_n) ≤ N`; in particular
+`R_2(P_n) ≤ ⌈(5n - 1)/3⌉`, far below `2n`. -/
+theorem ramseyNumber_two_pathGraph_le (n N : ℕ) (h : 5 * n ≤ 3 * N + 1) :
+    ramseyNumber 2 (pathGraph n) ≤ N := by
+  apply Nat.sInf_le
+  intro c
+  obtain ⟨i, l, hl, hlen⟩ := exists_long_monoPath N c
+  exact ⟨i, pathGraph_isContained_of_monoPath c i l hl n (by omega)⟩
+
+
+/-- The path graph is a tree. -/
+theorem pathGraph_isTree (m : ℕ) : (pathGraph (m + 1)).IsTree := by
+  classical
+  rw [isTree_iff_connected_and_card]
+  refine ⟨pathGraph_connected m, ?_⟩
+  have hE : (pathGraph (m + 1)).edgeSet =
+      (fun t : Fin m => s(t.castSucc, t.succ)) '' Set.univ := by
+    ext e
+    induction e using Sym2.ind with
+    | _ a b =>
+      simp only [mem_edgeSet, pathGraph_adj, Set.image_univ, Set.mem_range, Sym2.eq_iff]
+      constructor
+      · rintro (h | h)
+        · exact ⟨⟨a.val, by omega⟩, Or.inl ⟨Fin.ext rfl, Fin.ext (by simpa using h)⟩⟩
+        · exact ⟨⟨b.val, by omega⟩, Or.inr ⟨Fin.ext rfl, Fin.ext (by simpa using h)⟩⟩
+      · rintro ⟨t, (⟨rfl, rfl⟩ | ⟨rfl, rfl⟩)⟩
+        · left; simp
+        · right; simp
+  have hinj : Set.InjOn (fun t : Fin m => s(t.castSucc, t.succ)) Set.univ := by
+    intro a _ b _ hab
+    rcases Sym2.eq_iff.mp hab with ⟨h, _⟩ | ⟨h1, h2⟩
+    · exact Fin.castSucc_injective _ h
+    · have e1 := congrArg Fin.val h1
+      have e2 := congrArg Fin.val h2
+      simp at e1 e2
+      omega
+  rw [hE, Nat.card_coe_set_eq, hinj.ncard_image, Set.ncard_univ, Nat.card_eq_fintype_card,
+    Fintype.card_fin, Nat.card_eq_fintype_card, Fintype.card_fin]
+
+/-- **The equality `R_2(T) = 2n + O(1)` fails.** For every constant `C` there is a tree
+`T` on `n` vertices (a path) with `R_2(T) + C < 2n`.  So Erdős–Graham's upper bound
+`R_r(T) ≤ r·n + O(1)` is not matched by a lower bound of the same form for all trees,
+even for two colours. -/
+theorem ramseyNumber_two_not_two_mul_sub_const (C : ℕ) :
+    ∃ (n : ℕ) (T : SimpleGraph (Fin n)), T.IsTree ∧ ramseyNumber 2 T + C < 2 * n := by
+  refine ⟨3 * C + 1 + 1, pathGraph (3 * C + 1 + 1), pathGraph_isTree _, ?_⟩
+  have h := ramseyNumber_two_pathGraph_le (3 * C + 1 + 1) (5 * C + 3) (by omega)
   omega
 
 end JSP448

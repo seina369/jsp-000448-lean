@@ -9,10 +9,12 @@ Lean 4 formalization for [JSP-000448](https://github.com/TheJustinSunPrize/award
 `T` on `n` vertices — precisely `R_r(T) ≤ r(n-2) + 2` — together with `R_r(T) ≥ n`,
 and exact values showing that this upper bound cannot be improved in general.
 
-**What is not proved.** The two-sided equality `R_r(T) = r·n + O(1)`. For a fixed
-number of colours it is false for some trees: the two-colour Ramsey number of the
-path on `n` vertices is `⌊3n/2⌋ − 1` (Gerencsér–Gyárfás 1967). That fact is not
-formalized here.
+**The equality is false, and that is proved too.** Erdős and Graham asked for
+`R_r(T) = r·n + O(1)`. Already for two colours this fails: every 2-colouring of `K_N`
+has a monochromatic path on at least `(3N − 3)/5` vertices, so the path on `n`
+vertices has `R_2(P_n) ≤ (5n + 1)/3`, and `2n − R_2(P_n)` is unbounded
+(`ramseyNumber_two_not_two_mul_sub_const`). The sharp value `R_2(P_n) = ⌊3n/2⌋ − 1`
+(Gerencsér–Gyárfás 1967) is not proved here; the weaker bound suffices.
 
 **This is a formalization of known mathematics**, not new mathematics; see
 [References](#references).
@@ -31,7 +33,10 @@ formalized here.
 | `JSP448.ramseyNumber_tree_eq_of_prime` | For every prime `p`, every tree with `p` edges has `R_{p+1}(T) = p² + 1` (so the tight bound is attained by every such tree when `r = p + 1`). |
 | `JSP448.multicolor_ramsey_trees_asym_tight` | Off-diagonal: with trees of `kᵢ` edges in colour `i`, `∑ (kᵢ − 1) + 2` vertices suffice. |
 | `JSP448.ramseyNumber_tree_error_unbounded` | One-sided remark: no constant independent of `r` bounds `r·n − R_r(T)`. |
-| `JSP448.starGraph_isTree`, `JSP448.exists_star_tree`, `JSP448.ramsey_set_nonempty` | Non-vacuity. |
+| `JSP448.exists_long_monoPath` | Every 2-colouring of `K_N` has a monochromatic path on at least `(3N − 3)/5` vertices. |
+| `JSP448.ramseyNumber_two_pathGraph_le` | `R_2(P_n) ≤ N` whenever `5n ≤ 3N + 1`. |
+| `JSP448.ramseyNumber_two_not_two_mul_sub_const` | For every `C` there is a tree `T` on `n` vertices with `R_2(T) + C < 2n`: the equality `R_2(T) = 2n + O(1)` fails. |
+| `JSP448.starGraph_isTree`, `JSP448.pathGraph_isTree`, `JSP448.exists_star_tree`, `JSP448.ramsey_set_nonempty` | Non-vacuity. |
 
 Every declaration depends only on the standard axioms `propext`, `Classical.choice`,
 `Quot.sound`. No `sorry`, no extra axioms, no `native_decide`.
@@ -57,6 +62,13 @@ which is not an integer.
   colours). Edges of one colour lie on parallel lines of `p` points, so a connected
   graph on `p + 1` vertices does not fit.
 
+*Paths.* Take a longest monochromatic path `P`, say red, and let `U` be the vertices
+off it. A vertex of `U` is blue-joined to both ends of `P` and to at least one of any
+two consecutive vertices of `P`; two vertices of `U` red-joined crosswise to
+consecutive vertices of `P` are blue-joined. Disjoint consecutive pairs of `P` then
+serve as connectors for a blue zigzag path through `U` gaining at least three vertices
+per two vertices of `U`. It cannot be longer than `P`, so `|U| ≤ 2|P|/3 + 1`.
+
 ## Relation to earlier formalizations
 
 [zhangjun725/erdos557](https://github.com/zhangjun725/erdos557) (September 2026)
@@ -64,7 +76,8 @@ formalized the upper bounds `R_k(T) ≤ k(n−2) + 2` and, for `n` odd and `k` e
 `≤ k(n−2) + 1`, earlier than this repository, also from `tadamcz/erdos548`. The
 upper bounds here are the same statements. What this repository adds are the
 **lower-bound constructions and the resulting exact values** (stars; all trees with
-`p` edges and `p + 1` colours), the off-diagonal form, and the trivial lower bound.
+`p` edges and `p + 1` colours), the **refutation of the two-sided equality** via
+two-coloured paths, the off-diagonal form, and the trivial lower bound.
 
 ## Build
 
