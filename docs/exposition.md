@@ -76,17 +76,48 @@ bound with `r = p + 1`, `k = p` is `(p + 1)(p − 1) + 2 = p² + 1`:
 This is the simplest instance of Erdős and Graham's own lower bound, which uses
 more general block designs in place of the affine plane.
 
+## But it is not an equality: long paths
+
+Erdős and Graham asked whether `R_r(T)` *equals* `r·n` up to a bounded error. The
+bound above is sharp for stars and, for suitable `r`, for every tree — but not for
+every tree and every `r`. Paths are the counterexample, already with two colours.
+
+Colour `K_N` red and blue and let `P` be a longest monochromatic path, say red, with
+`k` vertices. Look at a vertex `u` not on `P`.
+
+- `u` is blue-joined to both ends of `P` (otherwise `P` could be extended).
+- Of any two consecutive vertices `a, b` of `P`, `u` is blue-joined to at least one
+  (otherwise `u` could be inserted between them).
+- If `u, u'` are both off `P`, with `a — u` red and `u' — b` red, then `u — u'` is
+  blue (otherwise `…a, u, u', b…` would be a longer red path).
+
+Now split the interior of `P` into disjoint consecutive pairs and walk through the
+outside vertices, using one pair per step. From the current outside vertex `u`: if
+some other outside vertex `w` shares a blue neighbour `y` in the pair, go `u, y, w`.
+If not, any two further outside vertices `w₁, w₂` see the *other* vertex `y` of the
+pair in blue, and `u — w₁` is blue by the third fact; go `u, w₁, y, w₂`. Either way
+each pair is used once, and the blue path gains at least three vertices for every two
+outside vertices consumed. Adding the two ends of `P` as extra blue connectors, the
+blue path would be longer than `P` unless there are few outside vertices: at most
+about `2k/3`. Hence `N ≤ 5k/3 + 1`:
+
+> **every 2-colouring of `K_N` has a monochromatic path on at least `(3N − 3)/5`
+> vertices** (`exists_long_monoPath`), so `R_2(P_n) ≤ (5n + 1)/3`, well below `2n`
+> (`ramseyNumber_two_not_two_mul_sub_const`).
+
+The true value, by a finer version of the same idea, is `R_2(P_n) = ⌊3n/2⌋ − 1`
+(Gerencsér–Gyárfás, 1967).
+
 ## What remains
 
-The upper bound `R_r(T) ≤ r·n − 2r + 2` is therefore sharp for stars and, for
-suitable numbers of colours, for every tree. It is *not* an equality for every
-tree and every `r`: with two colours the path on `n` vertices has Ramsey number
-only about `3n/2` (Gerencsér–Gyárfás). The exact value of `R_r(T)` for general
-trees and general `r` is open.
+So `R_r(T)` always lies between `n` and `r·n − 2r + 2`; the upper end is reached by
+stars and, for suitable `r`, by every tree; and it is not reached by paths. The exact
+value of `R_r(T)` for general trees and general `r` is open.
 
 ## What "formalized" means here
 
 Each statement above is a theorem in the proof assistant Lean 4, checked down to
 the axioms of mathematics by a small trusted kernel. The Erdős–Sós theorem is
 imported from an existing formalization (`tadamcz/erdos548`); the counting
-arguments, the three colourings and the exact values are in `JSP448.lean`.
+arguments, the three colourings, the exact values and the path argument are in
+`JSP448.lean`.
